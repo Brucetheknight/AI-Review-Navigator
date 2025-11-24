@@ -15,6 +15,7 @@ Single-page Vue 3 + Tailwind (CDN) implementation of **AI 综述领航员 (V4.7 
 ## Usage
 - Open `index.html` directly in a browser, or serve locally with a simple static server such as `npx serve .`.
 - Enter a SiliconFlow API key in the sidebar to enable the LLM-driven steps (gap extraction, SPARK synthesis, PRISMA plan, and writing automation).
+- The page depends on CDN assets (Vue, Plotly, Marked, Tailwind, Phosphor Icons) and browser `localStorage`, so ensure JavaScript is enabled and your network can reach the CDNs.
 
 ## Notes
 - Data is stored in `localStorage` under `ai_navigator_projects_v4` and `ai_navigator_key` to preserve projects between sessions.

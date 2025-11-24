@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI 综述领航员：基于 SPARK 工作流的科研综述助手，集成 OpenAlex 检索与 SiliconFlow LLM。">
     <title>AI 综述领航员 (V4.7 整合版)</title>
+
+    <!-- 预连接加速 CDN 资源加载 -->
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.plot.ly" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
     <!-- 1. 核心库 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -34,6 +40,12 @@
     <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body class="h-screen flex overflow-hidden">
+
+    <noscript>
+        <div style="padding: 16px; background: #0f172a; color: #f8fafc; text-align: center; width: 100%;">
+            需要开启 JavaScript 才能运行 AI 综述领航员。
+        </div>
+    </noscript>
 
     <div id="error-overlay">
         <h1 class="text-2xl font-bold mb-4">程序启动失败</h1>
