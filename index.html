@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 综述领航员 (V4.7 整合版)</title>
-    
+
     <!-- 1. 核心库 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+
     <!-- 2. Tailwind 配置 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -31,73 +31,7 @@
             ]
         }
     </script>
-
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0b1120; color: #e2e8f0; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        
-        .sidebar-link {
-            display: flex; align-items: center; padding: 12px 20px; color: #94a3b8;
-            transition: all 0.2s; border-left: 3px solid transparent; cursor: pointer;
-        }
-        .sidebar-link:hover { color: #f8fafc; background: rgba(255,255,255,0.03); }
-        
-        /* 激活样式优化 */
-        .sidebar-link.active {
-            color: #60a5fa; background: rgba(59, 130, 246, 0.15); border-left-color: #3b82f6;
-            font-weight: 600;
-        }
-
-        .glass-card {
-            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-        
-        .step-card {
-            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-            margin-bottom: 24px; overflow: hidden; transition: all 0.3s ease;
-        }
-        .step-card.active { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
-        .step-header { padding: 16px 24px; display: flex; align-items: center; gap: 16px; cursor: pointer; background: #1e293b; }
-        .step-card.active .step-header { background: #1e293b; border-bottom: 1px solid #334155; }
-        
-        .prose-invert { color: #cbd5e1; max-width: none; font-size: 15px; line-height: 1.7; }
-        .prose-invert h3 { color: #f1f5f9; font-weight: 700; margin-top: 1.5em; font-size: 1.25em; }
-        .prose-invert h4 { color: #e2e8f0; font-weight: 600; margin-top: 1.2em; }
-        .prose-invert strong { color: #60a5fa; }
-        .prose-invert ul { list-style-type: disc; padding-left: 1.5em; }
-        
-        .evidence-item { transition: all 0.2s; border: 1px solid transparent; }
-        .evidence-item:hover { background: #263345; }
-        .evidence-item.selected { background: #1e3a8a; border-color: #3b82f6; }
-        
-        .input-dark {
-            background-color: #0f172a; border: 1px solid #334155; color: #e2e8f0;
-            transition: all 0.2s;
-        }
-        .input-dark:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-
-        /* Step 6 Specific Styles */
-        .outline-node { position: relative; padding-left: 20px; }
-        .outline-node::before { content: ''; position: absolute; left: 7px; top: 24px; bottom: -10px; width: 2px; background: #334155; }
-        .outline-node:last-child::before { display: none; }
-        
-        .status-dot {
-            width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 10px; z-index: 10; position: relative;
-        }
-        .status-dot.pending { background: #334155; color: #94a3b8; }
-        .status-dot.writing { background: #3b82f6; color: white; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); animation: pulse 2s infinite; }
-        .status-dot.done { background: #10b981; color: white; }
-
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        
-        #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; color: red; padding: 50px; font-family: monospace; }
-    </style>
+    <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body class="h-screen flex overflow-hidden">
 
@@ -108,7 +42,6 @@
     </div>
 
     <div id="app" class="flex w-full h-full" v-cloak>
-        
         <!-- Sidebar -->
         <aside class="w-64 bg-[#0f172a] border-r border-slate-800 flex flex-col flex-shrink-0 z-20">
             <div class="h-16 flex items-center px-6 border-b border-slate-800">
@@ -125,8 +58,6 @@
                 </div>
 
                 <div class="px-6 mt-8 mb-2 text-xs font-bold text-slate-500 uppercase tracking-wider">SPARK 工作流</div>
-                
-                <!-- 修复点：使用 currentStep === step.id 确保精准高亮 -->
                 <div v-for="step in STEPS_CONFIG" :key="step.id"
                      @click="scrollToStep(step.id)"
                      :class="['sidebar-link', (view === 'workspace' && currentStep === step.id) ? 'active' : '']">
@@ -150,7 +81,6 @@
 
         <!-- Main Content -->
         <main class="flex-1 flex flex-col min-w-0 bg-[#0b1120] relative">
-            
             <header class="h-16 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between px-8 shadow-sm flex-shrink-0 z-10">
                 <div class="flex items-center">
                     <button v-if="view === 'workspace'" @click="view = 'dashboard'" class="mr-4 text-slate-400 hover:text-blue-400 transition-colors">
@@ -174,7 +104,6 @@
             </header>
 
             <div class="flex-1 overflow-y-auto p-8 scroll-smooth" id="mainScroll">
-                
                 <!-- Dashboard -->
                 <div v-if="view === 'dashboard'" class="max-w-6xl mx-auto animate-fade-in">
                     <div class="bg-gradient-to-r from-blue-900 to-slate-900 rounded-2xl p-8 border border-blue-800/50 shadow-2xl mb-8 flex justify-between items-center relative overflow-hidden">
@@ -237,7 +166,6 @@
 
                 <!-- Workspace -->
                 <div v-if="view === 'workspace'" class="max-w-6xl mx-auto pb-20 animate-fade-in">
-                    
                     <!-- Step 1: 广角镜 -->
                     <div id="step-1" :class="['step-card', currentStep === 1 ? 'active' : (currentStep > 1 ? 'completed' : '')]">
                         <div class="step-header" @click="toggleStep(1)">
@@ -416,7 +344,6 @@
                                                 <div class="text-xs text-slate-500 line-clamp-2 mb-2">{{ paper.abstract }}</div>
                                             </div>
                                         </div>
-                                        <!-- V4.5 修复：用户笔记输入框 -->
                                         <div v-if="paper.selected" class="mt-3 pt-3 border-t border-slate-700/50 pl-8">
                                             <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1"><i class="ph ph-flask"></i> 补充 Methods / Key Data</span><span class="text-[10px] text-slate-600">可选</span></div>
                                             <textarea v-model="paper.user_notes" class="w-full bg-slate-900/50 border border-slate-700 rounded p-2 text-xs text-slate-300 focus:border-indigo-500 outline-none transition-colors" rows="2" placeholder="在此粘贴原文中的关键方法、参数或实验数据..."></textarea>
@@ -489,7 +416,6 @@
                             </div>
                         </div>
                     </div>
-
                 </div>
 
             </div>
@@ -501,570 +427,7 @@
             document.getElementById('error-overlay').style.display = 'block';
             document.getElementById('error-msg').innerText = `${msg}\nLine: ${line}`;
         };
-
-        const { createApp, ref, reactive, watch, nextTick, onMounted, computed } = Vue;
-
-        createApp({
-            setup() {
-                const view = ref('dashboard');
-                const STORAGE_KEY = 'ai_navigator_projects_v4';
-                const KEY_KEY = 'ai_navigator_key';
-                const apiKey = ref(localStorage.getItem(KEY_KEY) || '');
-                const showKey = ref(false);
-                const loading = ref(false);
-                const loadingText = ref('处理中...');
-                const projectList = ref([]);
-                const schemeFeedback = ref('');
-                const selectedGapIndex = ref(-1);
-                
-                // 修复点：标题配置更新
-                const STEPS_CONFIG = [
-                    { id: 1, shortTitle: "广角镜", fullTitle: "1. 广角镜", icon: "ph-aperture" },
-                    { id: 2, shortTitle: "显微镜", fullTitle: "2. 显微镜", icon: "ph-microscope" },
-                    { id: 3, shortTitle: "孵化器", fullTitle: "3. 孵化器", icon: "ph-lightning" },
-                    { id: 4, shortTitle: "蓝图", fullTitle: "4. 蓝图", icon: "ph-compass" },
-                    { id: 5, shortTitle: "云端执行", fullTitle: "5. 云端执行", icon: "ph-cloud-arrow-down" },
-                    { id: 6, shortTitle: "写作助手", fullTitle: "6. 写作助手", icon: "ph-pen-nib" }
-                ];
-
-                const sparkSchema = {
-                    S: { label: 'Subject & Setting', cn: '对象与场景', color: 'blue', icon: 'ph-users-three', placeholder: '研究主体、数据集或环境背景...' },
-                    P: { label: 'Problem & Pain', cn: '问题与痛点', color: 'orange', icon: 'ph-lightning', placeholder: '现有局限、技术难题或知识缺口...' },
-                    A: { label: 'Approach & Action', cn: '方案与行动', color: 'purple', icon: 'ph-magic-wand', placeholder: '核心干预措施、新算法或实验设计...' },
-                    R: { label: 'Reference & Rigor', cn: '基准与稳健', color: 'slate', icon: 'ph-scales', placeholder: '对比基线(Baseline)及验证方法...' },
-                    K: { label: 'Key Result', cn: '结果与洞见', color: 'emerald', icon: 'ph-chart-polar', placeholder: '核心量化指标及定性结论...' }
-                };
-
-                const defaultProject = {
-                    id: null, title: '', doi: '', updatedAt: null, step: 1,
-                    searchQuery: '',
-                    stepData: {
-                        1: { done: false, result: null, analysis: null, year: null, citations: null, graphData: null, historyData: null, error: '' },
-                        2: { done: false, result: null, gaps: [], error: '' },
-                        3: { done: false, spark: {}, question: '', error: '' },
-                        4: { done: false, result: null, parsedScheme: {}, error: '' }, 
-                        5: { done: false, evidence: [], error: '' },
-                        6: { done: false, status: 'idle', outline: [], finalDraft: '', error: '' }
-                    }
-                };
-                const activeProject = ref(JSON.parse(JSON.stringify(defaultProject)));
-                const currentStep = ref(1);
-
-                const selectedEvidenceCount = computed(() => {
-                    return activeProject.value.stepData[5].evidence ? activeProject.value.stepData[5].evidence.filter(p => p.selected).length : 0;
-                });
-
-                function safeLoad(key, fallback) {
-                    try {
-                        const raw = localStorage.getItem(key);
-                        if (!raw) return fallback;
-                        return JSON.parse(raw);
-                    } catch (e) {
-                        console.warn('LocalStorage parse error for', key, e);
-                        return fallback;
-                    }
-                }
-
-                function safeSave(key, value) {
-                    try { localStorage.setItem(key, JSON.stringify(value)); }
-                    catch (e) { console.warn('LocalStorage save error for', key, e); }
-                }
-
-                onMounted(() => {
-                    const saved = safeLoad(STORAGE_KEY, []);
-                    projectList.value = Array.isArray(saved) ? saved : [];
-                });
-
-                watch(apiKey, (newVal) => {
-                    try { localStorage.setItem(KEY_KEY, newVal); } catch (e) { console.warn('Failed to persist key'); }
-                });
-                
-                watch(activeProject, (newVal) => {
-                    if (!newVal.id) return;
-                    const idx = projectList.value.findIndex(p => p.id === newVal.id);
-                    const projectToSave = JSON.parse(JSON.stringify(newVal));
-                    projectToSave.updatedAt = new Date().toISOString();
-                    projectToSave.step = Math.max(newVal.step, projectToSave.step || 1);
-                    if (idx > -1) projectList.value[idx] = projectToSave;
-                    else projectList.value.unshift(projectToSave);
-                    safeSave(STORAGE_KEY, projectList.value);
-                }, { deep: true });
-
-                function createNewProject() {
-                    activeProject.value = JSON.parse(JSON.stringify(defaultProject));
-                    activeProject.value.id = Date.now().toString();
-                    activeProject.value.updatedAt = new Date().toISOString();
-                    currentStep.value = 1;
-                    view.value = 'workspace';
-                }
-
-                function loadProject(id) {
-                    const target = projectList.value.find(p => p.id === id);
-                    if (target) {
-                        activeProject.value = JSON.parse(JSON.stringify(target));
-                        currentStep.value = target.step;
-                        view.value = 'workspace';
-                        if (target.stepData[1].graphData) {
-                            nextTick(() => {
-                                if(document.getElementById('graphDiv')) renderGraph(target.stepData[1].graphData);
-                                if(document.getElementById('historyChartDiv') && target.stepData[1].historyData) renderHistoryChart(target.stepData[1].historyData);
-                            });
-                        }
-                    }
-                }
-
-                function clearAllProjects() {
-                    if(confirm('确定清空所有项目吗？')) {
-                        projectList.value = [];
-                        localStorage.removeItem(STORAGE_KEY);
-                    }
-                }
-
-                function renameProject(id) {
-                    const p = projectList.value.find(p => p.id === id);
-                    if (p) {
-                        const newTitle = prompt("请输入新项目名称", p.title);
-                        if (newTitle) {
-                            p.title = newTitle;
-                            if (activeProject.value.id === id) activeProject.value.title = newTitle;
-                            safeSave(STORAGE_KEY, projectList.value);
-                        }
-                    }
-                }
-
-                function deleteProject(id) {
-                    if (confirm("确定删除该项目吗？此操作不可恢复。")) {
-                        const idx = projectList.value.findIndex(p => p.id === id);
-                        if (idx > -1) {
-                            projectList.value.splice(idx, 1);
-                            safeSave(STORAGE_KEY, projectList.value);
-                            if (activeProject.value.id === id) {
-                                view.value = 'dashboard';
-                                activeProject.value = JSON.parse(JSON.stringify(defaultProject));
-                            }
-                        }
-                    }
-                }
-
-                // 修复点：导航跳转修复
-                function scrollToStep(step) {
-                    if (!activeProject.value.id) return;
-                    // 仅允许跳转到已解锁的步骤 (或者当前进度的下一步)
-                    if (step > activeProject.value.step && !activeProject.value.stepData[step-1]?.done) return;
-
-                    if (view.value !== 'workspace') {
-                        view.value = 'workspace';
-                        nextTick(() => {
-                            // 延时确保 DOM 渲染完成
-                            setTimeout(() => {
-                                currentStep.value = step;
-                                const el = document.getElementById(`step-${step}`);
-                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 100);
-                        });
-                    } else {
-                        currentStep.value = step;
-                        nextTick(() => {
-                            const el = document.getElementById(`step-${step}`);
-                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        });
-                    }
-                }
-                
-                function toggleStep(step) { 
-                    if (step <= activeProject.value.step || (activeProject.value.stepData[step-1]?.done)) {
-                        currentStep.value = step;
-                        nextTick(() => document.getElementById(`step-${step}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-                    }
-                }
-
-                function nextStep() {
-                    if (currentStep.value < 6) {
-                        activeProject.value.step = Math.max(activeProject.value.step, currentStep.value + 1);
-                        currentStep.value++;
-                        nextTick(() => document.getElementById(`step-${currentStep.value}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-                    }
-                }
-
-                function extractJSON(text) {
-                    try { return JSON.parse(text); } catch (e) {
-                        const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-                        if (codeBlock) { try { return JSON.parse(codeBlock[1]); } catch(e2) {} }
-                        const firstBrace = text.indexOf('{');
-                        const lastBrace = text.lastIndexOf('}');
-                        if (firstBrace !== -1 && lastBrace !== -1) { try { return JSON.parse(text.substring(firstBrace, lastBrace + 1)); } catch(e3) {} }
-                        throw new Error("无法提取 JSON");
-                    }
-                }
-
-                function reconstructAbstract(invertedIndex) {
-                    if (!invertedIndex) return "No abstract available.";
-                    const words = [];
-                    for (const [word, positions] of Object.entries(invertedIndex)) {
-                        positions.forEach(pos => words[pos] = word);
-                    }
-                    return words.join(' ').replace(/\s+/g, ' ').trim();
-                }
-
-                async function callLLM(prompt) {
-                    if (!apiKey.value) { alert('请先输入 API Key'); throw new Error('No Key'); }
-                    try {
-                        const res = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.value}` },
-                            body: JSON.stringify({ model: 'deepseek-ai/DeepSeek-V3', messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 4000 })
-                        });
-                        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-                        const data = await res.json();
-                        return data.choices[0].message.content;
-                    } catch (e) { console.error(e); throw e; }
-                }
-
-                // --- Step Logic ---
-                async function runStep1() {
-                    loading.value = true; loadingText.value = '解析文献...'; activeProject.value.stepData[1].error = '';
-                    try {
-                        const cleanDoi = activeProject.value.doi.replace('https://doi.org/', '').trim();
-                        if (!cleanDoi) throw new Error('请输入有效 DOI');
-                        const res = await fetch(`https://api.openalex.org/works/https://doi.org/${cleanDoi}`);
-                        if (!res.ok) throw new Error('DOI 无效');
-                        const data = await res.json();
-                        activeProject.value.title = data.title;
-                        activeProject.value.searchQuery = data.title;
-                        activeProject.value.stepData[1].year = data.publication_year;
-                        activeProject.value.stepData[1].citations = data.cited_by_count;
-                        activeProject.value.stepData[1].historyData = data.counts_by_year || [];
-                        
-                        const seedId = data.id.split('/').pop();
-                        const relRes = await fetch(`https://api.openalex.org/works?filter=cites:${seedId}&per-page=30&sort=cited_by_count:desc`);
-                        const relData = await relRes.json();
-                        const graphData = { seed: data, related: relData.results || [] };
-                        activeProject.value.stepData[1].graphData = graphData;
-                        activeProject.value.stepData[1].result = true;
-                        await nextTick();
-                        renderHistoryChart(activeProject.value.stepData[1].historyData);
-                        renderGraph(graphData);
-                        
-                        const analysis = await callLLM(`论文《${data.title}》被 ${relData.results.length} 篇高引论文引用。请简要分析趋势。`);
-                        activeProject.value.stepData[1].analysis = analysis;
-                        activeProject.value.stepData[1].done = true;
-                        activeProject.value.step = Math.max(activeProject.value.step, 2);
-                    } catch (e) { activeProject.value.stepData[1].error = e.message; alert(e.message); } finally { loading.value = false; }
-                }
-
-                async function runStep2() {
-                    loading.value = true; loadingText.value = '扫描前沿文献...'; activeProject.value.stepData[2].error = ''; selectedGapIndex.value = -1;
-                    try {
-                        const q = activeProject.value.searchQuery || activeProject.value.title;
-                        const res = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=10&sort=relevance_score:desc`);
-                        if (!res.ok) throw new Error('OpenAlex 扫描失败');
-                        const data = await res.json();
-                        
-                        const papers = data.results.map(p => ({
-                            title: p.title,
-                            year: p.publication_year,
-                            abstract: reconstructAbstract(p.abstract_inverted_index).substring(0, 500)
-                        })).filter(p => p.abstract.length > 50);
-
-                        if (papers.length === 0) throw new Error('未找到包含摘要的相关文献，请尝试更换关键词');
-
-                        const context = papers.map((p, i) => `[${i+1}] ${p.title} (${p.year}): ${p.abstract}`).join('\n\n');
-
-                        loadingText.value = '提炼研究缺口...';
-                        const prompt = `你是一个科研选题顾问。请阅读以下该领域的最新文献摘要，提炼出 3-4 个核心的研究缺口 (Research Gaps)。
-【文献列表】
-${context}
-
-【要求】
-请严格按照以下 JSON 数组格式返回，不要包含 Markdown 标记：
-[
-  {
-    "status": "简述当前研究的主流做法或已取得的成果 (15字以内)",
-    "gap": "指出上述做法的局限性、未解决的问题或矛盾点 (30字以内)",
-    "source": "引用相关的文献编号，如 [1], [3]"
-  }
-]`;
-                        const rawResult = await callLLM(prompt);
-                        const gaps = extractJSON(rawResult);
-
-                        activeProject.value.stepData[2].gaps = gaps.map(g => ({ ...g, selected: false }));
-                        activeProject.value.stepData[2].result = true;
-                        activeProject.value.stepData[2].done = true;
-                        activeProject.value.step = Math.max(activeProject.value.step, 3);
-
-                    } catch (e) {
-                        activeProject.value.stepData[2].error = e.message;
-                        alert('缺口扫描失败: ' + e.message);
-                    } finally {
-                        loading.value = false;
-                    }
-                }
-
-                function selectGap(idx) {
-                    activeProject.value.stepData[2].gaps.forEach((g, i) => g.selected = i === idx);
-                    selectedGapIndex.value = idx;
-                    const selectedGap = activeProject.value.stepData[2].gaps[idx];
-                    activeProject.value.stepData[2].result = `当前主流做法：${selectedGap.status}。核心缺口：${selectedGap.gap}。`;
-                }
-
-                async function runStep3Spark() {
-                    loading.value = true; loadingText.value = 'SPARK 提取中...'; activeProject.value.stepData[3].error = '';
-                    try {
-                        const gapAnalysis = activeProject.value.stepData[2].result;
-                        const title = activeProject.value.title;
-                        const prompt = `你是一个跨学科科研专家。请基于以下研究背景和缺口分析，构建一个 "SPARK" 科研逻辑框架。
-                        【研究标题】: ${title}
-                        【缺口分析】: ${gapAnalysis}
-                        请严格按照以下 JSON 格式输出：
-                        {
-                          "spark": {
-                            "S": "...", "P": "...", "A": "...", "R": "...", "K": "..."
-                          },
-                          "question": "基于上述 SPARK 要素，合成一句流畅的学术研究问题 (Research Question)"
-                        }`;
-                        const rawResult = await callLLM(prompt);
-                        const resultObj = extractJSON(rawResult);
-                        activeProject.value.stepData[3].spark = resultObj.spark;
-                        activeProject.value.stepData[3].question = resultObj.question;
-                        activeProject.value.stepData[3].done = true;
-                        activeProject.value.step = Math.max(activeProject.value.step, 4);
-                    } catch(e){ activeProject.value.stepData[3].error = e.message; alert(e.message); } finally { loading.value = false; }
-                }
-
-                // Step 4: 蓝图 (方案)
-                async function runStep4() {
-                    loading.value = true; loadingText.value = '生成方案...'; activeProject.value.stepData[4].error = '';
-                    try {
-                        const spark = JSON.stringify(activeProject.value.stepData[3].spark);
-                        const userQuestion = activeProject.value.stepData[3].question; 
-                        
-                        const prompt = `基于以下科研逻辑，制定 PRISMA 检索方案。
-
-【核心研究问题 (用户修订版)】
-"${userQuestion}"
-
-【SPARK 逻辑框架】
-${spark}
-
-请制定 PRISMA 检索方案。
-**关键要求**：请同时生成一个适合 OpenAlex API 的简单查询字符串（仅包含 3-5 个核心关键词，用 OR/AND 连接）。
-
-输出纯 JSON：
-{
-    "question": "复述研究问题",
-    "inclusion": ["纳入标准1", "纳入标准2"],
-    "exclusion": ["排除标准1", "排除标准2"],
-    "openAlexQuery": "keyword1 AND (keyword2 OR keyword3)",
-    "databases": [{"name": "PubMed", "query": "..."}]
-}`;
-                        const rawResult = await callLLM(prompt);
-                        const schemeObj = extractJSON(rawResult);
-                        activeProject.value.stepData[4].parsedScheme = schemeObj;
-                        activeProject.value.stepData[4].result = rawResult;
-                        activeProject.value.stepData[4].done = true;
-                        activeProject.value.step = Math.max(activeProject.value.step, 5);
-                    } catch (e) { activeProject.value.stepData[4].error = e.message; alert(e.message); } finally { loading.value = false; }
-                }
-
-                async function runStep5() {
-                    loading.value = true; loadingText.value = '云端抓取中...'; activeProject.value.stepData[5].error = '';
-                    try {
-                        const query = activeProject.value.stepData[4].parsedScheme.openAlexQuery || activeProject.value.title;
-                        const res = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=20&sort=relevance_score:desc`);
-                        if (!res.ok) throw new Error('OpenAlex 检索失败');
-                        const data = await res.json();
-                        const evidence = data.results.map(item => {
-                            const fullAbs = reconstructAbstract(item.abstract_inverted_index);
-                            return {
-                                id: item.id,
-                                title: item.title,
-                                publication_year: item.publication_year,
-                                url: item.primary_location?.landing_page_url || item.doi,
-                                abstract: fullAbs.substring(0, 300) + '...',
-                                full_abstract: fullAbs.substring(0, 2000),
-                                selected: true,
-                                user_notes: ''
-                            };
-                        });
-                        activeProject.value.stepData[5].evidence = evidence;
-                        activeProject.value.stepData[5].done = true;
-                        activeProject.value.step = Math.max(activeProject.value.step, 6);
-                    } catch (e) { activeProject.value.stepData[5].error = e.message; alert(e.message); } finally { loading.value = false; }
-                }
-
-                function togglePaper(idx) {
-                    activeProject.value.stepData[5].evidence[idx].selected = !activeProject.value.stepData[5].evidence[idx].selected;
-                }
-
-                // --- Step 6: V4.0 Deep Synthesis Logic ---
-                
-                // 6.1 Generate Outline
-                async function generateOutline() {
-                    loading.value = true; loadingText.value = '生成大纲...'; activeProject.value.stepData[6].error = '';
-                    try {
-                        const spark = JSON.stringify(activeProject.value.stepData[3].spark);
-                        const question = activeProject.value.stepData[3].question;
-                        
-                        const prompt = `你是一个学术综述助手。基于以下研究逻辑，请为一篇系统综述生成一个标准的大纲结构。
-                        
-                        【研究问题】${question}
-                        【SPARK 逻辑】${spark}
-                        
-                        请严格返回一个 JSON 字符串数组，例如：
-                        ["1. Introduction", "2. Methodology", "3. Current Approaches", "4. Challenges & Gaps", "5. Conclusion"]
-                        `;
-                        
-                        const res = await callLLM(prompt);
-                        const outlineTitles = extractJSON(res);
-                        
-                        // Initialize outline structure
-                        activeProject.value.stepData[6].outline = outlineTitles.map(title => ({
-                            title: title,
-                            status: 'pending', // pending, writing, done
-                            content: ''
-                        }));
-                        activeProject.value.stepData[6].status = 'outlining';
-                        
-                    } catch (e) { activeProject.value.stepData[6].error = e.message; alert('大纲生成失败: ' + e.message); } finally { loading.value = false; }
-                }
-
-                function addChapter() {
-                    activeProject.value.stepData[6].outline.push({ title: 'New Chapter', status: 'pending', content: '' });
-                }
-                function removeChapter(idx) {
-                    activeProject.value.stepData[6].outline.splice(idx, 1);
-                }
-
-                // 6.2 Start Sequential Writing
-                async function startWriting() {
-                    try {
-                        activeProject.value.stepData[6].status = 'writing';
-                        activeProject.value.stepData[6].error = '';
-                        activeProject.value.stepData[6].finalDraft = '';
-                        
-                        // Prepare context once
-                        const selectedPapersRaw = activeProject.value.stepData[5].evidence.filter(p => p.selected);
-                        if (selectedPapersRaw.length === 0) { alert('请至少选择一篇文献'); activeProject.value.stepData[6].status = 'idle'; return; }
-                        const selectedPapers = selectedPapersRaw.slice(0, 10); // 控制上下文长度
-                        
-                        const context = selectedPapers.map((p, i) => {
-                            const abs = (p.full_abstract || '').substring(0, 1600);
-                            let text = `[${i+1}] Title: ${p.title} (${p.publication_year})\nAbstract: ${abs}\n`;
-                            if (p.user_notes && p.user_notes.trim()) {
-                                text += `[IMPORTANT] User-Provided Methods/Data: ${p.user_notes}\n`;
-                            }
-                            return text;
-                        }).join('\n\n');
-                        
-                        const spark = JSON.stringify(activeProject.value.stepData[3].spark);
-
-                        // Sequential Loop
-                        for (let i = 0; i < activeProject.value.stepData[6].outline.length; i++) {
-                            const chapter = activeProject.value.stepData[6].outline[i];
-                            chapter.status = 'writing';
-                            loading.value = true; loadingText.value = `正在撰写: ${chapter.title}`;
-                            
-                            try {
-                                const prompt = `你正在撰写一篇综述的章节：【${chapter.title}】。
-                                
-                                【SPARK 逻辑】${spark}
-                                【真实文献库】${context}
-                                
-                                请撰写该章节的内容。
-                                要求：
-                                1. 必须基于【真实文献库】中的内容。
-                                2. **特别注意**：如果文献包含 "[IMPORTANT] User-Provided Methods/Data"，这是用户从全文中提取的精确信息，请**优先**将其整合进 Methods 或 Results 的描述中。
-                                3. 引用必须标注来源编号，如 [1, 3]。
-                                4. 保持学术语气。
-                                5. 仅输出该章节的正文内容，不要重复标题。`;
-                                
-                                const content = await callLLM(prompt);
-                                chapter.content = content;
-                                chapter.status = 'done';
-                                
-                                // Live update final draft
-                                updateFinalDraft();
-                                
-                            } catch (e) {
-                                console.error(e);
-                                chapter.status = 'pending'; // Retry state?
-                                activeProject.value.stepData[6].error = e.message || '写作失败，请重试该章节';
-                                break;
-                            }
-                        }
-                        
-                        // 6.3 Finalize
-                        loading.value = false;
-                        if (!activeProject.value.stepData[6].error) {
-                            activeProject.value.stepData[6].status = 'finished';
-                            activeProject.value.stepData[6].done = true;
-                            
-                            // Append References
-                            const refs = "\n\n### References\n" + selectedPapers.map((p, i) => `[${i+1}] ${p.title}. (${p.publication_year}). DOI: ${p.url}`).join('\n');
-                            activeProject.value.stepData[6].finalDraft += refs;
-                        } else {
-                            activeProject.value.stepData[6].status = 'writing';
-                        }
-                    } catch (err) {
-                        activeProject.value.stepData[6].error = err.message || '写作流程失败';
-                        activeProject.value.stepData[6].status = 'idle';
-                        loading.value = false;
-                    }
-                }
-
-                function updateFinalDraft() {
-                    activeProject.value.stepData[6].finalDraft = activeProject.value.stepData[6].outline
-                        .filter(c => c.status === 'done')
-                        .map(c => `### ${c.title}\n\n${c.content}`)
-                        .join('\n\n');
-                }
-
-                // --- Rendering Helpers ---
-                function renderHistoryChart(data) {
-                     if (!data || data.length === 0) return;
-                     const sortedData = [...data].sort((a, b) => a.year - b.year);
-                     const trace = { x: sortedData.map(d=>d.year), y: sortedData.map(d=>d.cited_by_count), type: 'bar', marker: {color:'#3b82f6', opacity: 0.8} };
-                     const layout = { margin: {t:10, l:40, r:10, b:40}, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', xaxis: { title: 'Year', tickfont:{color:'#94a3b8', size: 10}, gridcolor:'#334155' }, yaxis: { title: 'Citations', tickfont:{color:'#94a3b8', size: 10}, gridcolor:'#334155' }, autosize: true };
-                     Plotly.newPlot('historyChartDiv', [trace], layout, {displayModeBar:false, responsive: true});
-                }
-                function renderGraph(data) { 
-                    const nodes = [{x:0,y:0,size:40, color:'#f59e0b', label: `[SEED] ${data.seed.title}`, year: data.seed.publication_year, citations: data.seed.cited_by_count, url: data.seed.doi}];
-                    const edgesX=[], edgesY=[];
-                    data.related.forEach((p,i)=>{
-                        const angle = (i / data.related.length) * 2 * Math.PI + (Math.random() * 0.2); 
-                        const r = 1.2 + Math.random() * 0.8; 
-                        const x = r * Math.cos(angle), y = r * Math.sin(angle);
-                        nodes.push({x, y, size: Math.max(8, Math.log(p.cited_by_count + 1) * 5), color: p.cited_by_count, label: p.title, year: p.publication_year, citations: p.cited_by_count, url: p.doi});
-                        edgesX.push(0, x, null); edgesY.push(0, y, null);
-                    });
-                    const edgeTrace = {x: edgesX, y: edgesY, mode:'lines', line:{color:'#475569', width:1, opacity: 0.3}, hoverinfo:'none'};
-                    const nodeTrace = {x: nodes.map(n=>n.x), y: nodes.map(n=>n.y), mode: 'markers', marker: {size: nodes.map(n=>n.size), color: nodes.map(n=>n.color || 0), colorscale: 'Bluered', reversescale: true, showscale: false, line: {color: '#ffffff', width: 0.5}}, text: nodes.map(n => `<b>${n.label}</b><br>Year: ${n.year}<br>Citations: ${n.citations}`), hovertemplate: '%{text}<extra></extra>', customdata: nodes.map(n => n.url)};
-                    Plotly.newPlot('graphDiv', [edgeTrace, nodeTrace], {paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', showlegend:false, xaxis:{visible:false}, yaxis:{visible:false}, margin:{t:0,l:0,r:0,b:0}, hovermode: 'closest'}, {displayModeBar:false, responsive: true}).then(gd => { gd.on('plotly_click', d => { const url = d.points[0].customdata; if(url) window.open(url, '_blank'); }); });
-                }
-                function formatDate(isoStr) { return isoStr ? new Date(isoStr).toLocaleDateString() : ''; }
-                function renderMarkdown(text) { return text ? marked.parse(text) : ''; }
-                function getStepName(step) { return STEPS_CONFIG[step-1]?.shortTitle || '未知'; }
-                function getStepColor(step) { return ['bg-blue-900 text-blue-300', 'bg-purple-900 text-purple-300', 'bg-orange-900 text-orange-300', 'bg-indigo-900 text-indigo-300', 'bg-slate-700 text-slate-300', 'bg-green-900 text-green-300'][step-1]; }
-                function testConnection() { alert('API Key Set'); }
-                function exportReport() {
-                    const p = activeProject.value;
-                    let md = `# ${p.title}\n\n${p.stepData[6].finalDraft}`;
-                    const blob = new Blob([md], { type: 'text/markdown' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = `${p.title || 'review'}.md`; a.click();
-                }
-
-                return {
-                    view, apiKey, showKey, loading, loadingText, projectList, activeProject, currentStep, schemeFeedback, selectedEvidenceCount, sparkSchema,
-                    selectedGapIndex, STEPS_CONFIG,
-                    createNewProject, loadProject, clearAllProjects, scrollToStep, toggleStep, nextStep,
-                    runStep1, runStep2, runStep3Spark, runStep4, runStep5, 
-                    generateOutline, addChapter, removeChapter, startWriting, 
-                    selectGap, togglePaper, formatDate, renderMarkdown, getStepName, getStepColor, testConnection, exportReport,
-                    renameProject, deleteProject
-                };
-            }
-        }).mount('#app');
     </script>
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>

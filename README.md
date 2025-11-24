@@ -3,7 +3,14 @@
 Single-page Vue 3 + Tailwind (CDN) implementation of **AI 综述领航员 (V4.7 整合版)**. The app runs entirely in the browser, pulls data from OpenAlex, and orchestrates the SPARK research workflow (seed analysis, gap finding, SPARK definition, retrieval blueprint, evidence curation, and writing assistant).
 
 ## Structure
-- `index.html` — standalone SPA using Vue 3 (CDN), Plotly, Marked, and Tailwind CDN configuration. All UI, logic, and styling are contained in this file for quick loading without a build step.
+- `index.html` — minimal shell that wires CDN assets and mounts the Vue app.
+- `src/styles.css` — shared styling extracted from the original inline blocks.
+- `src/constants.js` — shared enums/config for steps, SPARK schema, storage keys, and project factory.
+- `src/storage.js` — safe localStorage helpers.
+- `src/api.js` — OpenAlex + SiliconFlow request wrappers and abstract reconstruction helpers.
+- `src/charts.js` — Plotly rendering helpers for citation history and galaxy graph.
+- `src/utils.js` — markdown rendering, date formatting, and JSON extraction utilities.
+- `src/main.js` — Vue 3 composition-API app logic orchestrating the SPARK workflow.
 
 ## Usage
 - Open `index.html` directly in a browser, or serve locally with a simple static server such as `npx serve .`.
