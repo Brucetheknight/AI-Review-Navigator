@@ -1,13 +1,1070 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Review Navigator</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 综述领航员 (V4.7 整合版)</title>
+    
+    <!-- 1. 核心库 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- 2. Tailwind 配置 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 900: '#0b1120', 800: '#1e293b', 700: '#334155' }
+                    }
+                }
+            },
+            safelist: [
+                'bg-blue-500', 'bg-orange-500', 'bg-purple-500', 'bg-slate-500', 'bg-emerald-500',
+                'text-blue-400', 'text-orange-400', 'text-purple-400', 'text-slate-400', 'text-emerald-400',
+                'bg-blue-900/30', 'bg-orange-900/30', 'bg-purple-900/30', 'bg-slate-800', 'bg-emerald-900/30',
+                'border-l-4', 'border-yellow-500', 'border-green-500', 'border-blue-500', 'ring-1', 'ring-purple-500'
+            ]
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0b1120; color: #e2e8f0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        
+        .sidebar-link {
+            display: flex; align-items: center; padding: 12px 20px; color: #94a3b8;
+            transition: all 0.2s; border-left: 3px solid transparent; cursor: pointer;
+        }
+        .sidebar-link:hover { color: #f8fafc; background: rgba(255,255,255,0.03); }
+        
+        /* 激活样式优化 */
+        .sidebar-link.active {
+            color: #60a5fa; background: rgba(59, 130, 246, 0.15); border-left-color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .glass-card {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        
+        .step-card {
+            background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+            margin-bottom: 24px; overflow: hidden; transition: all 0.3s ease;
+        }
+        .step-card.active { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
+        .step-header { padding: 16px 24px; display: flex; align-items: center; gap: 16px; cursor: pointer; background: #1e293b; }
+        .step-card.active .step-header { background: #1e293b; border-bottom: 1px solid #334155; }
+        
+        .prose-invert { color: #cbd5e1; max-width: none; font-size: 15px; line-height: 1.7; }
+        .prose-invert h3 { color: #f1f5f9; font-weight: 700; margin-top: 1.5em; font-size: 1.25em; }
+        .prose-invert h4 { color: #e2e8f0; font-weight: 600; margin-top: 1.2em; }
+        .prose-invert strong { color: #60a5fa; }
+        .prose-invert ul { list-style-type: disc; padding-left: 1.5em; }
+        
+        .evidence-item { transition: all 0.2s; border: 1px solid transparent; }
+        .evidence-item:hover { background: #263345; }
+        .evidence-item.selected { background: #1e3a8a; border-color: #3b82f6; }
+        
+        .input-dark {
+            background-color: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+            transition: all 0.2s;
+        }
+        .input-dark:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+
+        /* Step 6 Specific Styles */
+        .outline-node { position: relative; padding-left: 20px; }
+        .outline-node::before { content: ''; position: absolute; left: 7px; top: 24px; bottom: -10px; width: 2px; background: #334155; }
+        .outline-node:last-child::before { display: none; }
+        
+        .status-dot {
+            width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; z-index: 10; position: relative;
+        }
+        .status-dot.pending { background: #334155; color: #94a3b8; }
+        .status-dot.writing { background: #3b82f6; color: white; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); animation: pulse 2s infinite; }
+        .status-dot.done { background: #10b981; color: white; }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        
+        #error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; color: red; padding: 50px; font-family: monospace; }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden">
+
+    <div id="error-overlay">
+        <h1 class="text-2xl font-bold mb-4">程序启动失败</h1>
+        <pre id="error-msg"></pre>
+        <p class="mt-4 text-white">请尝试刷新页面，或检查网络连接（CDN加载失败）。</p>
+    </div>
+
+    <div id="app" class="flex w-full h-full" v-cloak>
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-[#0f172a] border-r border-slate-800 flex flex-col flex-shrink-0 z-20">
+            <div class="h-16 flex items-center px-6 border-b border-slate-800">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-blue-500/30">
+                    <i class="ph ph-sparkle text-white text-xl"></i>
+                </div>
+                <span class="text-lg font-bold text-white tracking-wide">AI 综述领航员</span>
+            </div>
+
+            <nav class="flex-1 py-6 space-y-1 overflow-y-auto">
+                <div @click="view = 'dashboard'" :class="['sidebar-link', view === 'dashboard' ? 'active' : '']">
+                    <i class="ph ph-folder-open text-xl mr-3"></i>
+                    <span class="font-medium">项目管理</span>
+                </div>
+
+                <div class="px-6 mt-8 mb-2 text-xs font-bold text-slate-500 uppercase tracking-wider">SPARK 工作流</div>
+                
+                <!-- 修复点：使用 currentStep === step.id 确保精准高亮 -->
+                <div v-for="step in STEPS_CONFIG" :key="step.id"
+                     @click="scrollToStep(step.id)"
+                     :class="['sidebar-link', (view === 'workspace' && currentStep === step.id) ? 'active' : '']">
+                    <i :class="['text-xl mr-3', step.icon]"></i>
+                    <span>{{ step.shortTitle }}</span>
+                </div>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800 bg-[#0f172a]">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="text-xs text-slate-500">API 配置 (SiliconFlow)</div>
+                    <button @click="showKey = !showKey" class="text-slate-500 hover:text-white"><i :class="showKey ? 'ph ph-eye-slash' : 'ph ph-eye'"></i></button>
+                </div>
+                <input v-model="apiKey" :type="showKey ? 'text' : 'password'" placeholder="输入 sk-..." 
+                       class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:border-blue-500 outline-none mb-2 transition-colors">
+                <button @click="testConnection" class="w-full bg-slate-700 hover:bg-slate-600 text-white text-xs py-1.5 rounded transition-colors flex items-center justify-center gap-2">
+                    <i class="ph ph-plugs-connected"></i> 测试连接
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col min-w-0 bg-[#0b1120] relative">
+            
+            <header class="h-16 bg-[#0f172a] border-b border-slate-800 flex items-center justify-between px-8 shadow-sm flex-shrink-0 z-10">
+                <div class="flex items-center">
+                    <button v-if="view === 'workspace'" @click="view = 'dashboard'" class="mr-4 text-slate-400 hover:text-blue-400 transition-colors">
+                        <i class="ph ph-arrow-left text-xl"></i>
+                    </button>
+                    <h2 class="text-lg font-bold text-slate-100 truncate max-w-md">
+                        {{ view === 'dashboard' ? '项目管理中心' : (activeProject.title || '新项目工作台') }}
+                    </h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button v-if="view === 'workspace'" @click="exportReport" class="text-sm text-slate-400 hover:text-blue-400 flex items-center gap-1 px-3 py-1.5 rounded hover:bg-slate-800 transition-colors">
+                        <i class="ph ph-download-simple text-lg"></i> 导出报告
+                    </button>
+                    <span v-if="loading" class="text-sm text-blue-400 flex items-center bg-blue-900/30 px-3 py-1 rounded-full border border-blue-800">
+                        <i class="ph ph-spinner animate-spin mr-2"></i> {{ loadingText }}
+                    </span>
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm border border-slate-700">
+                        U
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-8 scroll-smooth" id="mainScroll">
+                
+                <!-- Dashboard -->
+                <div v-if="view === 'dashboard'" class="max-w-6xl mx-auto animate-fade-in">
+                    <div class="bg-gradient-to-r from-blue-900 to-slate-900 rounded-2xl p-8 border border-blue-800/50 shadow-2xl mb-8 flex justify-between items-center relative overflow-hidden">
+                        <div class="absolute top-0 right-0 opacity-20 pointer-events-none">
+                            <i class="ph ph-sparkle text-9xl transform translate-x-10 -translate-y-10 text-blue-500"></i>
+                        </div>
+                        <div class="relative z-10">
+                            <h1 class="text-2xl font-bold mb-2 text-white">SPARK 2.0 科研逻辑引擎</h1>
+                            <p class="text-blue-200 opacity-80 max-w-xl">基于全维科研评价标准 (Subject, Problem, Approach, Reference, Key Result)，打造深度循证综述。</p>
+                        </div>
+                        <button @click="createNewProject" class="relative z-10 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-500 transition-all flex items-center gap-2">
+                            <i class="ph ph-plus-circle text-xl"></i> 新建项目
+                        </button>
+                    </div>
+
+                    <div class="glass-card overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+                            <h3 class="font-bold text-slate-200">项目列表 ({{ projectList.length }})</h3>
+                            <button @click="clearAllProjects" class="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                                <i class="ph ph-trash"></i> 清空
+                            </button>
+                        </div>
+                        <div v-if="projectList.length === 0" class="p-16 text-center text-slate-500">
+                            <i class="ph ph-folder-dashed text-5xl mb-4 opacity-30"></i>
+                            <p>暂无项目，请点击上方按钮新建</p>
+                        </div>
+                        <table v-else class="w-full text-left text-sm text-slate-400">
+                            <thead class="bg-slate-900/50 text-xs uppercase font-medium text-slate-500">
+                                <tr>
+                                    <th class="px-6 py-3">项目名称</th>
+                                    <th class="px-6 py-3">当前阶段</th>
+                                    <th class="px-6 py-3">更新时间</th>
+                                    <th class="px-6 py-3 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700">
+                                <tr v-for="p in projectList" :key="p.id" class="hover:bg-slate-800/50 transition-colors group">
+                                    <td class="px-6 py-4 font-medium text-slate-200 cursor-pointer" @click="loadProject(p.id)">
+                                        {{ p.title || '未命名项目' }}
+                                    </td>
+                                    <td class="px-6 py-4 cursor-pointer" @click="loadProject(p.id)">
+                                        <span :class="['px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap', getStepColor(p.step)]">
+                                            {{ getStepName(p.step) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 cursor-pointer" @click="loadProject(p.id)">{{ formatDate(p.updatedAt) }}</td>
+                                    <td class="px-6 py-4 text-right flex items-center justify-end gap-3">
+                                        <button @click.stop="renameProject(p.id)" class="text-slate-500 hover:text-blue-400" title="重命名">
+                                            <i class="ph ph-pencil-simple text-lg"></i>
+                                        </button>
+                                        <button @click.stop="deleteProject(p.id)" class="text-slate-500 hover:text-red-400" title="删除">
+                                            <i class="ph ph-trash text-lg"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Workspace -->
+                <div v-if="view === 'workspace'" class="max-w-6xl mx-auto pb-20 animate-fade-in">
+                    
+                    <!-- Step 1: 广角镜 -->
+                    <div id="step-1" :class="['step-card', currentStep === 1 ? 'active' : (currentStep > 1 ? 'completed' : '')]">
+                        <div class="step-header" @click="toggleStep(1)">
+                            <div class="step-icon bg-slate-800 text-slate-400"><i class="ph ph-aperture"></i></div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-slate-200 text-lg">{{ STEPS_CONFIG[0].fullTitle }}</h3>
+                                <p v-if="currentStep === 1" class="text-sm text-slate-500 mt-1">输入 DOI，构建知识星图。</p>
+                            </div>
+                            <i v-if="currentStep > 1" class="ph ph-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <div v-show="currentStep === 1 || activeProject.stepData[1].done" class="px-6 pb-8 border-t border-slate-700 pt-6 bg-[#0b1120]">
+                            <div v-if="!activeProject.stepData[1].done" class="flex gap-3 mb-6 max-w-2xl">
+                                <input v-model="activeProject.doi" type="text" class="input-dark flex-1 rounded-xl px-5 py-3" placeholder="例如: 10.1038/nature14539">
+                                <button @click="runStep1" :disabled="loading" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50">开始分析</button>
+                            </div>
+                            <p v-if="activeProject.stepData[1].error" class="text-red-400 text-sm mb-4">{{ activeProject.stepData[1].error }}</p>
+                            <div v-if="activeProject.stepData[1].result" class="space-y-6">
+                                <div class="glass-card p-6">
+                                    <div class="flex flex-col md:flex-row gap-8 items-start">
+                                        <div class="flex-1">
+                                            <div class="flex items-start justify-between mb-4">
+                                                <span class="bg-blue-900/50 text-blue-300 text-xs font-bold px-2 py-1 rounded border border-blue-800">SEED PAPER</span>
+                                                <a :href="`https://doi.org/${activeProject.doi}`" target="_blank" class="text-slate-500 hover:text-blue-400"><i class="ph ph-arrow-square-out text-xl"></i></a>
+                                            </div>
+                                            <h4 class="font-bold text-slate-100 text-xl mb-3 leading-tight">{{ activeProject.title }}</h4>
+                                            <div class="flex gap-4 text-sm text-slate-400">
+                                                <span class="flex items-center gap-1"><i class="ph ph-calendar-blank"></i> {{ activeProject.stepData[1].year }}</span>
+                                                <span class="flex items-center gap-1"><i class="ph ph-quotes"></i> Citations: {{ activeProject.stepData[1].citations }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 w-full min-h-[200px] bg-slate-900/30 rounded-lg border border-slate-800 p-2">
+                                            <div id="historyChartDiv" class="w-full h-full"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="glass-card p-1 relative h-[600px]">
+                                    <div class="absolute top-4 left-4 z-10 bg-slate-900/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-bold text-slate-400 flex items-center gap-2"><i class="ph ph-graph text-blue-400"></i> Citation Galaxy</div>
+                                    <div id="graphDiv" class="w-full h-full rounded-xl bg-[#0b1120]"></div>
+                                    <div class="absolute bottom-4 right-4 text-xs text-slate-500 bg-slate-900/50 px-2 py-1 rounded border border-slate-800"><i class="ph ph-mouse-left"></i> Click to open | Scroll to zoom</div>
+                                </div>
+                                <div class="glass-card p-6 border-l-4 border-blue-500">
+                                    <h4 class="font-bold text-slate-200 mb-4 flex items-center gap-2"><i class="ph ph-strategy text-blue-400"></i> AI 战略纪要</h4>
+                                    <div v-if="activeProject.stepData[1].analysis" class="prose-invert text-sm text-slate-300" v-html="renderMarkdown(activeProject.stepData[1].analysis)"></div>
+                                    <div v-else class="flex items-center gap-2 text-slate-500 text-sm animate-pulse"><i class="ph ph-spinner animate-spin"></i> 正在生成领域分析...</div>
+                                </div>
+                                <div v-if="currentStep === 1" class="text-right"><button @click="nextStep" class="text-blue-400 font-bold hover:underline">下一步 <i class="ph ph-arrow-down"></i></button></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: 显微镜 -->
+                    <div id="step-2" :class="['step-card', currentStep === 2 ? 'active' : (currentStep > 2 ? 'completed' : '')]">
+                        <div class="step-header" @click="toggleStep(2)">
+                            <div class="step-icon bg-slate-800 text-slate-400"><i class="ph ph-microscope"></i></div>
+                            <div class="flex-1"><h3 class="font-bold text-slate-200 text-lg">{{ STEPS_CONFIG[1].fullTitle }}</h3></div>
+                            <i v-if="currentStep > 2" class="ph ph-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <div v-show="currentStep === 2 || activeProject.stepData[2].done" class="px-6 pb-8 border-t border-slate-700 pt-6 bg-[#0b1120]">
+                            <div v-if="!activeProject.stepData[2].done" class="mb-6">
+                                <div class="flex gap-3 mb-3">
+                                    <input v-model="activeProject.searchQuery" type="text" class="input-dark flex-1 rounded-xl px-5 py-3" placeholder="输入细分方向关键词 (默认使用种子文献标题)">
+                                    <button @click="runStep2" :disabled="loading" class="bg-purple-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 transition-all"><i class="ph ph-scan"></i> 扫描前沿缺口</button>
+                                </div>
+                                <p class="text-xs text-slate-500"><i class="ph ph-info"></i> 系统将自动阅读相关度最高的 10 篇文献摘要，提炼核心矛盾。</p>
+                            </div>
+                            <div v-if="activeProject.stepData[2].result">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h4 class="font-bold text-slate-300 flex items-center gap-2"><i class="ph ph-kanban text-purple-400"></i> 发现 {{ activeProject.stepData[2].gaps.length }} 个关键缺口</h4>
+                                    <span class="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">基于 OpenAlex 实时数据</span>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 mb-6">
+                                    <div v-for="(item, idx) in activeProject.stepData[2].gaps" :key="idx" @click="selectGap(idx)" :class="['p-5 rounded-xl border transition-all cursor-pointer relative group', item.selected ? 'bg-purple-900/20 border-purple-500 ring-1 ring-purple-500' : 'bg-slate-800 border-slate-700 hover:border-purple-500/50']">
+                                        <div v-if="item.selected" class="absolute top-4 right-4 text-purple-400"><i class="ph-fill ph-check-circle text-xl"></i></div>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div class="border-r border-slate-700/50 pr-6">
+                                                <div class="flex items-center gap-2 mb-2"><span class="bg-blue-900/30 text-blue-400 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Current Status</span></div>
+                                                <p class="text-slate-300 text-sm leading-relaxed">{{ item.status }}</p>
+                                            </div>
+                                            <div>
+                                                <div class="flex items-center gap-2 mb-2"><span class="bg-red-900/30 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Identified Gap</span></div>
+                                                <p class="text-slate-200 text-sm font-medium leading-relaxed">{{ item.gap }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 pt-3 border-t border-slate-700/50 flex items-center gap-2 text-xs text-slate-500"><i class="ph ph-article"></i> 来源: {{ item.source }}</div>
+                                    </div>
+                                </div>
+                                <div v-if="currentStep === 2 && activeProject.stepData[2].done" class="flex justify-end items-center gap-4">
+                                    <span class="text-xs text-slate-400" v-if="selectedGapIndex === -1">请点击选择一个核心缺口</span>
+                                    <button @click="nextStep" :disabled="selectedGapIndex === -1" :class="['px-6 py-2 rounded-lg font-bold transition-colors flex items-center gap-2', selectedGapIndex !== -1 ? 'bg-purple-600 text-white hover:bg-purple-500' : 'bg-slate-700 text-slate-500 cursor-not-allowed']">基于此缺口定义 SPARK <i class="ph ph-arrow-down"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: 孵化器 -->
+                    <div id="step-3" :class="['step-card', currentStep === 3 ? 'active' : (currentStep > 3 ? 'completed' : '')]">
+                        <div class="step-header" @click="toggleStep(3)">
+                            <div class="step-icon bg-slate-800 text-slate-400"><i class="ph ph-lightning"></i></div>
+                            <div class="flex-1"><h3 class="font-bold text-slate-200 text-lg">{{ STEPS_CONFIG[2].fullTitle }}</h3></div>
+                            <i v-if="currentStep > 3" class="ph ph-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <div v-show="currentStep === 3 || activeProject.stepData[3].done" class="px-6 pb-8 border-t border-slate-700 pt-6 bg-[#0b1120]">
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
+                                <div v-for="(conf, key) in sparkSchema" :key="key" class="bg-slate-800 rounded-xl border border-slate-700 shadow-sm flex flex-col h-full group">
+                                    <div :class="`h-1.5 w-full bg-${conf.color}-500`"></div>
+                                    <div class="p-4 flex-1 flex flex-col">
+                                        <div class="flex items-center gap-2 mb-3">
+                                            <div :class="`w-8 h-8 rounded-lg bg-${conf.color}-900/30 text-${conf.color}-400 flex items-center justify-center`"><i :class="['ph-bold text-lg', conf.icon]"></i></div>
+                                            <div><div :class="`font-bold text-${conf.color}-400 text-lg leading-none`">{{ key }}</div><div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{{ conf.label }}</div></div>
+                                        </div>
+                                        <div v-if="activeProject.stepData[3].spark && activeProject.stepData[3].spark[key]" class="flex-1"><p class="text-sm text-slate-300 leading-relaxed font-medium">{{ activeProject.stepData[3].spark[key] }}</p></div>
+                                        <div v-else class="flex-1 flex items-center justify-center text-center py-4"><span class="text-xs text-slate-600 italic">{{ conf.placeholder }}</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="!activeProject.stepData[3].done" class="mb-2 text-center">
+                                <button @click="runStep3Spark" :disabled="loading" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold hover:bg-blue-50 disabled:opacity-50 flex items-center justify-center gap-2 mx-auto transition-colors"><i class="ph ph-sparkle"></i> AI 智能提取 SPARK 定义</button>
+                            </div>
+                            <p v-if="activeProject.stepData[3].error" class="text-red-400 text-sm mb-4 text-center">{{ activeProject.stepData[3].error }}</p>
+                            <div v-if="activeProject.stepData[3].done" class="bg-slate-800/50 rounded-lg p-4 border border-slate-700 mb-4">
+                                <div class="flex justify-between items-center mb-2"><span class="text-xs font-bold text-blue-400 flex items-center gap-2"><i class="ph ph-pencil-simple"></i> 合成研究问题 (可人工修订)</span></div>
+                                <textarea v-model="activeProject.stepData[3].question" rows="2" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-200 text-sm focus:border-blue-500 outline-none resize-none transition-colors"></textarea>
+                            </div>
+                            <div v-if="currentStep === 3 && activeProject.stepData[3].done" class="mt-4 text-right"><button @click="nextStep" class="text-white font-bold hover:text-blue-400 flex items-center justify-end gap-1 ml-auto">确认并进入检索方案 <i class="ph ph-arrow-right"></i></button></div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: 蓝图 -->
+                    <div id="step-4" :class="['step-card', currentStep === 4 ? 'active' : (currentStep > 4 ? 'completed' : '')]">
+                        <div class="step-header" @click="toggleStep(4)">
+                            <div class="step-icon bg-slate-800 text-slate-400"><i class="ph ph-compass"></i></div>
+                            <div class="flex-1"><h3 class="font-bold text-slate-200 text-lg">{{ STEPS_CONFIG[3].fullTitle }}</h3></div>
+                            <i v-if="currentStep > 4" class="ph ph-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <div v-show="currentStep === 4 || activeProject.stepData[4].done" class="px-6 pb-8 border-t border-slate-700 pt-6 bg-[#0b1120]">
+                            <div v-if="!activeProject.stepData[4].result" class="mb-2">
+                                <button @click="runStep4" :disabled="loading" class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50">生成检索蓝图</button>
+                            </div>
+                            <p v-if="activeProject.stepData[4].error" class="text-red-400 text-sm mb-4">{{ activeProject.stepData[4].error }}</p>
+                            <div v-if="activeProject.stepData[4].result">
+                                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 text-sm space-y-5 mb-6">
+                                    <div><span class="font-bold text-slate-300 block mb-1">研究问题:</span> <span class="text-slate-400">{{ activeProject.stepData[4].parsedScheme.question }}</span></div>
+                                    <div class="bg-slate-900/50 p-4 rounded-lg border border-indigo-900/50">
+                                        <div class="flex justify-between items-center mb-2"><span class="font-bold text-indigo-400 flex items-center gap-2"><i class="ph ph-terminal-window"></i> OpenAlex 执行指令 (机器码)</span><span class="text-[10px] bg-indigo-900/30 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">可编辑</span></div>
+                                        <div class="relative"><span class="absolute left-3 top-2.5 text-indigo-500 select-none">></span><input v-model="activeProject.stepData[4].parsedScheme.openAlexQuery" class="w-full bg-slate-950 border border-slate-700 rounded-md py-2 pl-6 pr-3 text-indigo-200 font-mono text-xs focus:border-indigo-500 outline-none transition-colors" placeholder="输入 OpenAlex 检索式..." /></div>
+                                    </div>
+                                </div>
+                                <div v-if="currentStep === 4 && activeProject.stepData[4].done" class="mt-4 text-right"><button @click="nextStep" class="text-indigo-400 font-bold hover:underline">下一步 <i class="ph ph-arrow-down"></i></button></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: 云端执行 -->
+                    <div id="step-5" :class="['step-card', currentStep === 5 ? 'active' : (currentStep > 5 ? 'completed' : '')]">
+                        <div class="step-header" @click="toggleStep(5)">
+                            <div class="step-icon bg-slate-800 text-slate-400"><i class="ph ph-cloud-arrow-down"></i></div>
+                            <div class="flex-1"><h3 class="font-bold text-slate-200 text-lg">{{ STEPS_CONFIG[4].fullTitle }}</h3></div>
+                            <i v-if="currentStep > 5" class="ph ph-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <div v-show="currentStep === 5 || activeProject.stepData[5].done" class="px-6 pb-8 border-t border-slate-700 pt-6 bg-[#0b1120]">
+                            <div v-if="!activeProject.stepData[5].done" class="glass-card p-6 mb-2 border-l-4 border-l-blue-500">
+                                <h4 class="font-bold text-slate-200 mb-2">准备执行云端检索</h4>
+                                <p class="text-sm text-slate-400 mb-4">系统将使用 Step 4 中您确认的指令，自动从 OpenAlex 抓取真实文献，并清洗摘要构建证据矩阵。</p>
+                                <button @click="runStep5" :disabled="loading" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 w-full justify-center"><i class="ph ph-rocket-launch"></i> 启动云端执行</button>
+                            </div>
+                            <p v-if="activeProject.stepData[5].error" class="text-red-400 text-sm mb-4">{{ activeProject.stepData[5].error }}</p>
+                            <div v-if="activeProject.stepData[5].evidence && activeProject.stepData[5].evidence.length > 0">
+                                <div class="flex justify-between items-center mb-4"><h4 class="font-bold text-slate-300">证据矩阵 (已选 {{ selectedEvidenceCount }} / {{ activeProject.stepData[5].evidence.length }})</h4></div>
+                                <div class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                                    <div v-for="(paper, idx) in activeProject.stepData[5].evidence" :key="paper.id" :class="['evidence-item p-4 rounded-lg border transition-all', paper.selected ? 'bg-slate-800 border-blue-500 ring-1 ring-blue-500' : 'bg-slate-800 border-slate-700 opacity-70']">
+                                        <div class="flex gap-3 cursor-pointer" @click="togglePaper(idx)">
+                                            <div :class="['w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-1', paper.selected ? 'bg-blue-600 border-blue-600' : 'border-slate-500']"><i v-if="paper.selected" class="ph ph-check text-white text-xs"></i></div>
+                                            <div class="flex-1">
+                                                <div class="font-bold text-slate-200 text-sm mb-1">{{ paper.title }}</div>
+                                                <div class="text-xs text-slate-400 mb-2">{{ paper.publication_year }} · <a :href="paper.url" target="_blank" @click.stop class="text-blue-400 hover:underline flex-inline items-center gap-1"><i class="ph ph-arrow-square-out"></i> 阅读原文</a></div>
+                                                <div class="text-xs text-slate-500 line-clamp-2 mb-2">{{ paper.abstract }}</div>
+                                            </div>
+                                        </div>
+                                        <!-- V4.5 修复：用户笔记输入框 -->
+                                        <div v-if="paper.selected" class="mt-3 pt-3 border-t border-slate-700/50 pl-8">
+                                            <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1"><i class="ph ph-flask"></i> 补充 Methods / Key Data</span><span class="text-[10px] text-slate-600">可选</span></div>
+                                            <textarea v-model="paper.user_notes" class="w-full bg-slate-900/50 border border-slate-700 rounded p-2 text-xs text-slate-300 focus:border-indigo-500 outline-none transition-colors" rows="2" placeholder="在此粘贴原文中的关键方法、参数或实验数据..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-if="currentStep === 5" class="mt-6 text-right"><button @click="nextStep" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition-colors">确认证据并进入写作 <i class="ph ph-arrow-right"></i></button></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 6: 写作助手 -->
+                    <div id="step-6" :class="['step-card', currentStep === 6 ? 'active' : (currentStep > 6 ? 'completed' : '')]">
+                        <div class="step-header" @click="toggleStep(6)">
+                            <div class="step-icon bg-slate-800 text-slate-400"><i class="ph ph-pen-nib"></i></div>
+                            <div class="flex-1"><h3 class="font-bold text-slate-200 text-lg">{{ STEPS_CONFIG[5].fullTitle }}</h3></div>
+                            <i v-if="currentStep > 6" class="ph ph-check-circle text-green-500 text-2xl"></i>
+                        </div>
+                        <div v-show="currentStep === 6 || activeProject.stepData[6].done" class="px-6 pb-8 border-t border-slate-700 pt-6 bg-[#0b1120]">
+                            <p v-if="activeProject.stepData[6].error" class="text-red-400 text-sm mb-4">{{ activeProject.stepData[6].error }}</p>
+
+                            <div v-if="!activeProject.stepData[6].status || activeProject.stepData[6].status === 'idle'" class="mb-4">
+                                <div class="bg-blue-900/20 border border-blue-800 p-6 rounded-2xl mb-6 text-center">
+                                    <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30"><i class="ph ph-brain text-3xl text-white"></i></div>
+                                    <h4 class="text-xl font-bold text-white mb-2">准备进行深度合成写作</h4>
+                                    <p class="text-slate-400 text-sm mb-6 max-w-lg mx-auto">AI 将基于 SPARK 逻辑和 {{ selectedEvidenceCount }} 篇真实文献，采用“分治法”策略：先规划大纲，再逐章撰写，最后合成全文。</p>
+                                    <button @click="generateOutline" :disabled="loading" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-500 disabled:opacity-50 transition-all transform hover:scale-105"><i class="ph ph-list-dashes"></i> 生成写作大纲</button>
+                                </div>
+                            </div>
+
+                            <div v-if="activeProject.stepData[6].status === 'outlining'" class="mb-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h4 class="font-bold text-slate-300">确认写作大纲</h4>
+                                    <button @click="startWriting" :disabled="loading" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-500">确认并开始撰写 <i class="ph ph-play"></i></button>
+                                </div>
+                                <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
+                                    <div v-for="(chapter, idx) in activeProject.stepData[6].outline" :key="idx" class="flex items-center gap-3">
+                                        <span class="text-slate-500 font-mono text-xs w-6">{{ idx + 1 }}.</span>
+                                        <input v-model="chapter.title" class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:border-blue-500 outline-none" />
+                                        <button @click="removeChapter(idx)" class="text-red-400 hover:text-red-300"><i class="ph ph-trash"></i></button>
+                                    </div>
+                                    <button @click="addChapter" class="w-full py-2 border-2 border-dashed border-slate-600 rounded-lg text-slate-500 text-sm hover:border-slate-500 hover:text-slate-400 transition-colors">+ 添加章节</button>
+                                </div>
+                            </div>
+
+                            <div v-if="activeProject.stepData[6].status === 'writing' || activeProject.stepData[6].status === 'finished'" class="flex h-[600px] gap-6">
+                                <div class="w-1/3 bg-slate-800 rounded-xl border border-slate-700 p-4 overflow-y-auto">
+                                    <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Writing Progress</h5>
+                                    <div class="space-y-0">
+                                        <div v-for="(chapter, idx) in activeProject.stepData[6].outline" :key="idx" class="outline-node flex items-start gap-3 pb-6 last:pb-0">
+                                            <div :class="['status-dot flex-shrink-0', chapter.status]">
+                                                <i v-if="chapter.status === 'done'" class="ph-bold ph-check"></i>
+                                                <i v-else-if="chapter.status === 'writing'" class="ph-bold ph-spinner animate-spin"></i>
+                                                <span v-else class="w-1.5 h-1.5 bg-current rounded-full"></span>
+                                            </div>
+                                            <div>
+                                                <div :class="['text-sm font-bold transition-colors', chapter.status === 'writing' ? 'text-blue-400' : (chapter.status === 'done' ? 'text-slate-300' : 'text-slate-500')]">{{ chapter.title }}</div>
+                                                <div class="text-xs text-slate-500 mt-1">{{ chapter.status === 'done' ? '已完成' : (chapter.status === 'writing' ? '正在撰写...' : '等待中') }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex-1 bg-slate-900 rounded-xl border border-slate-700 p-8 overflow-y-auto shadow-inner relative">
+                                    <div v-if="activeProject.stepData[6].finalDraft" class="prose-invert max-w-none" v-html="renderMarkdown(activeProject.stepData[6].finalDraft)"></div>
+                                    <div v-else class="flex flex-col items-center justify-center h-full text-slate-600"><i class="ph ph-typewriter text-4xl mb-2"></i><p>等待写入...</p></div>
+                                    <div v-if="activeProject.stepData[6].status === 'finished'" class="absolute top-4 right-4 flex gap-2">
+                                        <button @click="exportReport" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-blue-500 transition-colors"><i class="ph ph-download-simple"></i> 导出全文</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        window.onerror = function(msg, url, line) {
+            document.getElementById('error-overlay').style.display = 'block';
+            document.getElementById('error-msg').innerText = `${msg}\nLine: ${line}`;
+        };
+
+        const { createApp, ref, reactive, watch, nextTick, onMounted, computed } = Vue;
+
+        createApp({
+            setup() {
+                const view = ref('dashboard');
+                const STORAGE_KEY = 'ai_navigator_projects_v4';
+                const KEY_KEY = 'ai_navigator_key';
+                const apiKey = ref(localStorage.getItem(KEY_KEY) || '');
+                const showKey = ref(false);
+                const loading = ref(false);
+                const loadingText = ref('处理中...');
+                const projectList = ref([]);
+                const schemeFeedback = ref('');
+                const selectedGapIndex = ref(-1);
+                
+                // 修复点：标题配置更新
+                const STEPS_CONFIG = [
+                    { id: 1, shortTitle: "广角镜", fullTitle: "1. 广角镜", icon: "ph-aperture" },
+                    { id: 2, shortTitle: "显微镜", fullTitle: "2. 显微镜", icon: "ph-microscope" },
+                    { id: 3, shortTitle: "孵化器", fullTitle: "3. 孵化器", icon: "ph-lightning" },
+                    { id: 4, shortTitle: "蓝图", fullTitle: "4. 蓝图", icon: "ph-compass" },
+                    { id: 5, shortTitle: "云端执行", fullTitle: "5. 云端执行", icon: "ph-cloud-arrow-down" },
+                    { id: 6, shortTitle: "写作助手", fullTitle: "6. 写作助手", icon: "ph-pen-nib" }
+                ];
+
+                const sparkSchema = {
+                    S: { label: 'Subject & Setting', cn: '对象与场景', color: 'blue', icon: 'ph-users-three', placeholder: '研究主体、数据集或环境背景...' },
+                    P: { label: 'Problem & Pain', cn: '问题与痛点', color: 'orange', icon: 'ph-lightning', placeholder: '现有局限、技术难题或知识缺口...' },
+                    A: { label: 'Approach & Action', cn: '方案与行动', color: 'purple', icon: 'ph-magic-wand', placeholder: '核心干预措施、新算法或实验设计...' },
+                    R: { label: 'Reference & Rigor', cn: '基准与稳健', color: 'slate', icon: 'ph-scales', placeholder: '对比基线(Baseline)及验证方法...' },
+                    K: { label: 'Key Result', cn: '结果与洞见', color: 'emerald', icon: 'ph-chart-polar', placeholder: '核心量化指标及定性结论...' }
+                };
+
+                const defaultProject = {
+                    id: null, title: '', doi: '', updatedAt: null, step: 1,
+                    searchQuery: '',
+                    stepData: {
+                        1: { done: false, result: null, analysis: null, year: null, citations: null, graphData: null, historyData: null, error: '' },
+                        2: { done: false, result: null, gaps: [], error: '' },
+                        3: { done: false, spark: {}, question: '', error: '' },
+                        4: { done: false, result: null, parsedScheme: {}, error: '' }, 
+                        5: { done: false, evidence: [], error: '' },
+                        6: { done: false, status: 'idle', outline: [], finalDraft: '', error: '' }
+                    }
+                };
+                const activeProject = ref(JSON.parse(JSON.stringify(defaultProject)));
+                const currentStep = ref(1);
+
+                const selectedEvidenceCount = computed(() => {
+                    return activeProject.value.stepData[5].evidence ? activeProject.value.stepData[5].evidence.filter(p => p.selected).length : 0;
+                });
+
+                function safeLoad(key, fallback) {
+                    try {
+                        const raw = localStorage.getItem(key);
+                        if (!raw) return fallback;
+                        return JSON.parse(raw);
+                    } catch (e) {
+                        console.warn('LocalStorage parse error for', key, e);
+                        return fallback;
+                    }
+                }
+
+                function safeSave(key, value) {
+                    try { localStorage.setItem(key, JSON.stringify(value)); }
+                    catch (e) { console.warn('LocalStorage save error for', key, e); }
+                }
+
+                onMounted(() => {
+                    const saved = safeLoad(STORAGE_KEY, []);
+                    projectList.value = Array.isArray(saved) ? saved : [];
+                });
+
+                watch(apiKey, (newVal) => {
+                    try { localStorage.setItem(KEY_KEY, newVal); } catch (e) { console.warn('Failed to persist key'); }
+                });
+                
+                watch(activeProject, (newVal) => {
+                    if (!newVal.id) return;
+                    const idx = projectList.value.findIndex(p => p.id === newVal.id);
+                    const projectToSave = JSON.parse(JSON.stringify(newVal));
+                    projectToSave.updatedAt = new Date().toISOString();
+                    projectToSave.step = Math.max(newVal.step, projectToSave.step || 1);
+                    if (idx > -1) projectList.value[idx] = projectToSave;
+                    else projectList.value.unshift(projectToSave);
+                    safeSave(STORAGE_KEY, projectList.value);
+                }, { deep: true });
+
+                function createNewProject() {
+                    activeProject.value = JSON.parse(JSON.stringify(defaultProject));
+                    activeProject.value.id = Date.now().toString();
+                    activeProject.value.updatedAt = new Date().toISOString();
+                    currentStep.value = 1;
+                    view.value = 'workspace';
+                }
+
+                function loadProject(id) {
+                    const target = projectList.value.find(p => p.id === id);
+                    if (target) {
+                        activeProject.value = JSON.parse(JSON.stringify(target));
+                        currentStep.value = target.step;
+                        view.value = 'workspace';
+                        if (target.stepData[1].graphData) {
+                            nextTick(() => {
+                                if(document.getElementById('graphDiv')) renderGraph(target.stepData[1].graphData);
+                                if(document.getElementById('historyChartDiv') && target.stepData[1].historyData) renderHistoryChart(target.stepData[1].historyData);
+                            });
+                        }
+                    }
+                }
+
+                function clearAllProjects() {
+                    if(confirm('确定清空所有项目吗？')) {
+                        projectList.value = [];
+                        localStorage.removeItem(STORAGE_KEY);
+                    }
+                }
+
+                function renameProject(id) {
+                    const p = projectList.value.find(p => p.id === id);
+                    if (p) {
+                        const newTitle = prompt("请输入新项目名称", p.title);
+                        if (newTitle) {
+                            p.title = newTitle;
+                            if (activeProject.value.id === id) activeProject.value.title = newTitle;
+                            safeSave(STORAGE_KEY, projectList.value);
+                        }
+                    }
+                }
+
+                function deleteProject(id) {
+                    if (confirm("确定删除该项目吗？此操作不可恢复。")) {
+                        const idx = projectList.value.findIndex(p => p.id === id);
+                        if (idx > -1) {
+                            projectList.value.splice(idx, 1);
+                            safeSave(STORAGE_KEY, projectList.value);
+                            if (activeProject.value.id === id) {
+                                view.value = 'dashboard';
+                                activeProject.value = JSON.parse(JSON.stringify(defaultProject));
+                            }
+                        }
+                    }
+                }
+
+                // 修复点：导航跳转修复
+                function scrollToStep(step) {
+                    if (!activeProject.value.id) return;
+                    // 仅允许跳转到已解锁的步骤 (或者当前进度的下一步)
+                    if (step > activeProject.value.step && !activeProject.value.stepData[step-1]?.done) return;
+
+                    if (view.value !== 'workspace') {
+                        view.value = 'workspace';
+                        nextTick(() => {
+                            // 延时确保 DOM 渲染完成
+                            setTimeout(() => {
+                                currentStep.value = step;
+                                const el = document.getElementById(`step-${step}`);
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 100);
+                        });
+                    } else {
+                        currentStep.value = step;
+                        nextTick(() => {
+                            const el = document.getElementById(`step-${step}`);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        });
+                    }
+                }
+                
+                function toggleStep(step) { 
+                    if (step <= activeProject.value.step || (activeProject.value.stepData[step-1]?.done)) {
+                        currentStep.value = step;
+                        nextTick(() => document.getElementById(`step-${step}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+                    }
+                }
+
+                function nextStep() {
+                    if (currentStep.value < 6) {
+                        activeProject.value.step = Math.max(activeProject.value.step, currentStep.value + 1);
+                        currentStep.value++;
+                        nextTick(() => document.getElementById(`step-${currentStep.value}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+                    }
+                }
+
+                function extractJSON(text) {
+                    try { return JSON.parse(text); } catch (e) {
+                        const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                        if (codeBlock) { try { return JSON.parse(codeBlock[1]); } catch(e2) {} }
+                        const firstBrace = text.indexOf('{');
+                        const lastBrace = text.lastIndexOf('}');
+                        if (firstBrace !== -1 && lastBrace !== -1) { try { return JSON.parse(text.substring(firstBrace, lastBrace + 1)); } catch(e3) {} }
+                        throw new Error("无法提取 JSON");
+                    }
+                }
+
+                function reconstructAbstract(invertedIndex) {
+                    if (!invertedIndex) return "No abstract available.";
+                    const words = [];
+                    for (const [word, positions] of Object.entries(invertedIndex)) {
+                        positions.forEach(pos => words[pos] = word);
+                    }
+                    return words.join(' ').replace(/\s+/g, ' ').trim();
+                }
+
+                async function callLLM(prompt) {
+                    if (!apiKey.value) { alert('请先输入 API Key'); throw new Error('No Key'); }
+                    try {
+                        const res = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.value}` },
+                            body: JSON.stringify({ model: 'deepseek-ai/DeepSeek-V3', messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 4000 })
+                        });
+                        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                        const data = await res.json();
+                        return data.choices[0].message.content;
+                    } catch (e) { console.error(e); throw e; }
+                }
+
+                // --- Step Logic ---
+                async function runStep1() {
+                    loading.value = true; loadingText.value = '解析文献...'; activeProject.value.stepData[1].error = '';
+                    try {
+                        const cleanDoi = activeProject.value.doi.replace('https://doi.org/', '').trim();
+                        if (!cleanDoi) throw new Error('请输入有效 DOI');
+                        const res = await fetch(`https://api.openalex.org/works/https://doi.org/${cleanDoi}`);
+                        if (!res.ok) throw new Error('DOI 无效');
+                        const data = await res.json();
+                        activeProject.value.title = data.title;
+                        activeProject.value.searchQuery = data.title;
+                        activeProject.value.stepData[1].year = data.publication_year;
+                        activeProject.value.stepData[1].citations = data.cited_by_count;
+                        activeProject.value.stepData[1].historyData = data.counts_by_year || [];
+                        
+                        const seedId = data.id.split('/').pop();
+                        const relRes = await fetch(`https://api.openalex.org/works?filter=cites:${seedId}&per-page=30&sort=cited_by_count:desc`);
+                        const relData = await relRes.json();
+                        const graphData = { seed: data, related: relData.results || [] };
+                        activeProject.value.stepData[1].graphData = graphData;
+                        activeProject.value.stepData[1].result = true;
+                        await nextTick();
+                        renderHistoryChart(activeProject.value.stepData[1].historyData);
+                        renderGraph(graphData);
+                        
+                        const analysis = await callLLM(`论文《${data.title}》被 ${relData.results.length} 篇高引论文引用。请简要分析趋势。`);
+                        activeProject.value.stepData[1].analysis = analysis;
+                        activeProject.value.stepData[1].done = true;
+                        activeProject.value.step = Math.max(activeProject.value.step, 2);
+                    } catch (e) { activeProject.value.stepData[1].error = e.message; alert(e.message); } finally { loading.value = false; }
+                }
+
+                async function runStep2() {
+                    loading.value = true; loadingText.value = '扫描前沿文献...'; activeProject.value.stepData[2].error = ''; selectedGapIndex.value = -1;
+                    try {
+                        const q = activeProject.value.searchQuery || activeProject.value.title;
+                        const res = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=10&sort=relevance_score:desc`);
+                        if (!res.ok) throw new Error('OpenAlex 扫描失败');
+                        const data = await res.json();
+                        
+                        const papers = data.results.map(p => ({
+                            title: p.title,
+                            year: p.publication_year,
+                            abstract: reconstructAbstract(p.abstract_inverted_index).substring(0, 500)
+                        })).filter(p => p.abstract.length > 50);
+
+                        if (papers.length === 0) throw new Error('未找到包含摘要的相关文献，请尝试更换关键词');
+
+                        const context = papers.map((p, i) => `[${i+1}] ${p.title} (${p.year}): ${p.abstract}`).join('\n\n');
+
+                        loadingText.value = '提炼研究缺口...';
+                        const prompt = `你是一个科研选题顾问。请阅读以下该领域的最新文献摘要，提炼出 3-4 个核心的研究缺口 (Research Gaps)。
+【文献列表】
+${context}
+
+【要求】
+请严格按照以下 JSON 数组格式返回，不要包含 Markdown 标记：
+[
+  {
+    "status": "简述当前研究的主流做法或已取得的成果 (15字以内)",
+    "gap": "指出上述做法的局限性、未解决的问题或矛盾点 (30字以内)",
+    "source": "引用相关的文献编号，如 [1], [3]"
+  }
+]`;
+                        const rawResult = await callLLM(prompt);
+                        const gaps = extractJSON(rawResult);
+
+                        activeProject.value.stepData[2].gaps = gaps.map(g => ({ ...g, selected: false }));
+                        activeProject.value.stepData[2].result = true;
+                        activeProject.value.stepData[2].done = true;
+                        activeProject.value.step = Math.max(activeProject.value.step, 3);
+
+                    } catch (e) {
+                        activeProject.value.stepData[2].error = e.message;
+                        alert('缺口扫描失败: ' + e.message);
+                    } finally {
+                        loading.value = false;
+                    }
+                }
+
+                function selectGap(idx) {
+                    activeProject.value.stepData[2].gaps.forEach((g, i) => g.selected = i === idx);
+                    selectedGapIndex.value = idx;
+                    const selectedGap = activeProject.value.stepData[2].gaps[idx];
+                    activeProject.value.stepData[2].result = `当前主流做法：${selectedGap.status}。核心缺口：${selectedGap.gap}。`;
+                }
+
+                async function runStep3Spark() {
+                    loading.value = true; loadingText.value = 'SPARK 提取中...'; activeProject.value.stepData[3].error = '';
+                    try {
+                        const gapAnalysis = activeProject.value.stepData[2].result;
+                        const title = activeProject.value.title;
+                        const prompt = `你是一个跨学科科研专家。请基于以下研究背景和缺口分析，构建一个 "SPARK" 科研逻辑框架。
+                        【研究标题】: ${title}
+                        【缺口分析】: ${gapAnalysis}
+                        请严格按照以下 JSON 格式输出：
+                        {
+                          "spark": {
+                            "S": "...", "P": "...", "A": "...", "R": "...", "K": "..."
+                          },
+                          "question": "基于上述 SPARK 要素，合成一句流畅的学术研究问题 (Research Question)"
+                        }`;
+                        const rawResult = await callLLM(prompt);
+                        const resultObj = extractJSON(rawResult);
+                        activeProject.value.stepData[3].spark = resultObj.spark;
+                        activeProject.value.stepData[3].question = resultObj.question;
+                        activeProject.value.stepData[3].done = true;
+                        activeProject.value.step = Math.max(activeProject.value.step, 4);
+                    } catch(e){ activeProject.value.stepData[3].error = e.message; alert(e.message); } finally { loading.value = false; }
+                }
+
+                // Step 4: 蓝图 (方案)
+                async function runStep4() {
+                    loading.value = true; loadingText.value = '生成方案...'; activeProject.value.stepData[4].error = '';
+                    try {
+                        const spark = JSON.stringify(activeProject.value.stepData[3].spark);
+                        const userQuestion = activeProject.value.stepData[3].question; 
+                        
+                        const prompt = `基于以下科研逻辑，制定 PRISMA 检索方案。
+
+【核心研究问题 (用户修订版)】
+"${userQuestion}"
+
+【SPARK 逻辑框架】
+${spark}
+
+请制定 PRISMA 检索方案。
+**关键要求**：请同时生成一个适合 OpenAlex API 的简单查询字符串（仅包含 3-5 个核心关键词，用 OR/AND 连接）。
+
+输出纯 JSON：
+{
+    "question": "复述研究问题",
+    "inclusion": ["纳入标准1", "纳入标准2"],
+    "exclusion": ["排除标准1", "排除标准2"],
+    "openAlexQuery": "keyword1 AND (keyword2 OR keyword3)",
+    "databases": [{"name": "PubMed", "query": "..."}]
+}`;
+                        const rawResult = await callLLM(prompt);
+                        const schemeObj = extractJSON(rawResult);
+                        activeProject.value.stepData[4].parsedScheme = schemeObj;
+                        activeProject.value.stepData[4].result = rawResult;
+                        activeProject.value.stepData[4].done = true;
+                        activeProject.value.step = Math.max(activeProject.value.step, 5);
+                    } catch (e) { activeProject.value.stepData[4].error = e.message; alert(e.message); } finally { loading.value = false; }
+                }
+
+                async function runStep5() {
+                    loading.value = true; loadingText.value = '云端抓取中...'; activeProject.value.stepData[5].error = '';
+                    try {
+                        const query = activeProject.value.stepData[4].parsedScheme.openAlexQuery || activeProject.value.title;
+                        const res = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=20&sort=relevance_score:desc`);
+                        if (!res.ok) throw new Error('OpenAlex 检索失败');
+                        const data = await res.json();
+                        const evidence = data.results.map(item => {
+                            const fullAbs = reconstructAbstract(item.abstract_inverted_index);
+                            return {
+                                id: item.id,
+                                title: item.title,
+                                publication_year: item.publication_year,
+                                url: item.primary_location?.landing_page_url || item.doi,
+                                abstract: fullAbs.substring(0, 300) + '...',
+                                full_abstract: fullAbs.substring(0, 2000),
+                                selected: true,
+                                user_notes: ''
+                            };
+                        });
+                        activeProject.value.stepData[5].evidence = evidence;
+                        activeProject.value.stepData[5].done = true;
+                        activeProject.value.step = Math.max(activeProject.value.step, 6);
+                    } catch (e) { activeProject.value.stepData[5].error = e.message; alert(e.message); } finally { loading.value = false; }
+                }
+
+                function togglePaper(idx) {
+                    activeProject.value.stepData[5].evidence[idx].selected = !activeProject.value.stepData[5].evidence[idx].selected;
+                }
+
+                // --- Step 6: V4.0 Deep Synthesis Logic ---
+                
+                // 6.1 Generate Outline
+                async function generateOutline() {
+                    loading.value = true; loadingText.value = '生成大纲...'; activeProject.value.stepData[6].error = '';
+                    try {
+                        const spark = JSON.stringify(activeProject.value.stepData[3].spark);
+                        const question = activeProject.value.stepData[3].question;
+                        
+                        const prompt = `你是一个学术综述助手。基于以下研究逻辑，请为一篇系统综述生成一个标准的大纲结构。
+                        
+                        【研究问题】${question}
+                        【SPARK 逻辑】${spark}
+                        
+                        请严格返回一个 JSON 字符串数组，例如：
+                        ["1. Introduction", "2. Methodology", "3. Current Approaches", "4. Challenges & Gaps", "5. Conclusion"]
+                        `;
+                        
+                        const res = await callLLM(prompt);
+                        const outlineTitles = extractJSON(res);
+                        
+                        // Initialize outline structure
+                        activeProject.value.stepData[6].outline = outlineTitles.map(title => ({
+                            title: title,
+                            status: 'pending', // pending, writing, done
+                            content: ''
+                        }));
+                        activeProject.value.stepData[6].status = 'outlining';
+                        
+                    } catch (e) { activeProject.value.stepData[6].error = e.message; alert('大纲生成失败: ' + e.message); } finally { loading.value = false; }
+                }
+
+                function addChapter() {
+                    activeProject.value.stepData[6].outline.push({ title: 'New Chapter', status: 'pending', content: '' });
+                }
+                function removeChapter(idx) {
+                    activeProject.value.stepData[6].outline.splice(idx, 1);
+                }
+
+                // 6.2 Start Sequential Writing
+                async function startWriting() {
+                    try {
+                        activeProject.value.stepData[6].status = 'writing';
+                        activeProject.value.stepData[6].error = '';
+                        activeProject.value.stepData[6].finalDraft = '';
+                        
+                        // Prepare context once
+                        const selectedPapersRaw = activeProject.value.stepData[5].evidence.filter(p => p.selected);
+                        if (selectedPapersRaw.length === 0) { alert('请至少选择一篇文献'); activeProject.value.stepData[6].status = 'idle'; return; }
+                        const selectedPapers = selectedPapersRaw.slice(0, 10); // 控制上下文长度
+                        
+                        const context = selectedPapers.map((p, i) => {
+                            const abs = (p.full_abstract || '').substring(0, 1600);
+                            let text = `[${i+1}] Title: ${p.title} (${p.publication_year})\nAbstract: ${abs}\n`;
+                            if (p.user_notes && p.user_notes.trim()) {
+                                text += `[IMPORTANT] User-Provided Methods/Data: ${p.user_notes}\n`;
+                            }
+                            return text;
+                        }).join('\n\n');
+                        
+                        const spark = JSON.stringify(activeProject.value.stepData[3].spark);
+
+                        // Sequential Loop
+                        for (let i = 0; i < activeProject.value.stepData[6].outline.length; i++) {
+                            const chapter = activeProject.value.stepData[6].outline[i];
+                            chapter.status = 'writing';
+                            loading.value = true; loadingText.value = `正在撰写: ${chapter.title}`;
+                            
+                            try {
+                                const prompt = `你正在撰写一篇综述的章节：【${chapter.title}】。
+                                
+                                【SPARK 逻辑】${spark}
+                                【真实文献库】${context}
+                                
+                                请撰写该章节的内容。
+                                要求：
+                                1. 必须基于【真实文献库】中的内容。
+                                2. **特别注意**：如果文献包含 "[IMPORTANT] User-Provided Methods/Data"，这是用户从全文中提取的精确信息，请**优先**将其整合进 Methods 或 Results 的描述中。
+                                3. 引用必须标注来源编号，如 [1, 3]。
+                                4. 保持学术语气。
+                                5. 仅输出该章节的正文内容，不要重复标题。`;
+                                
+                                const content = await callLLM(prompt);
+                                chapter.content = content;
+                                chapter.status = 'done';
+                                
+                                // Live update final draft
+                                updateFinalDraft();
+                                
+                            } catch (e) {
+                                console.error(e);
+                                chapter.status = 'pending'; // Retry state?
+                                activeProject.value.stepData[6].error = e.message || '写作失败，请重试该章节';
+                                break;
+                            }
+                        }
+                        
+                        // 6.3 Finalize
+                        loading.value = false;
+                        if (!activeProject.value.stepData[6].error) {
+                            activeProject.value.stepData[6].status = 'finished';
+                            activeProject.value.stepData[6].done = true;
+                            
+                            // Append References
+                            const refs = "\n\n### References\n" + selectedPapers.map((p, i) => `[${i+1}] ${p.title}. (${p.publication_year}). DOI: ${p.url}`).join('\n');
+                            activeProject.value.stepData[6].finalDraft += refs;
+                        } else {
+                            activeProject.value.stepData[6].status = 'writing';
+                        }
+                    } catch (err) {
+                        activeProject.value.stepData[6].error = err.message || '写作流程失败';
+                        activeProject.value.stepData[6].status = 'idle';
+                        loading.value = false;
+                    }
+                }
+
+                function updateFinalDraft() {
+                    activeProject.value.stepData[6].finalDraft = activeProject.value.stepData[6].outline
+                        .filter(c => c.status === 'done')
+                        .map(c => `### ${c.title}\n\n${c.content}`)
+                        .join('\n\n');
+                }
+
+                // --- Rendering Helpers ---
+                function renderHistoryChart(data) {
+                     if (!data || data.length === 0) return;
+                     const sortedData = [...data].sort((a, b) => a.year - b.year);
+                     const trace = { x: sortedData.map(d=>d.year), y: sortedData.map(d=>d.cited_by_count), type: 'bar', marker: {color:'#3b82f6', opacity: 0.8} };
+                     const layout = { margin: {t:10, l:40, r:10, b:40}, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', xaxis: { title: 'Year', tickfont:{color:'#94a3b8', size: 10}, gridcolor:'#334155' }, yaxis: { title: 'Citations', tickfont:{color:'#94a3b8', size: 10}, gridcolor:'#334155' }, autosize: true };
+                     Plotly.newPlot('historyChartDiv', [trace], layout, {displayModeBar:false, responsive: true});
+                }
+                function renderGraph(data) { 
+                    const nodes = [{x:0,y:0,size:40, color:'#f59e0b', label: `[SEED] ${data.seed.title}`, year: data.seed.publication_year, citations: data.seed.cited_by_count, url: data.seed.doi}];
+                    const edgesX=[], edgesY=[];
+                    data.related.forEach((p,i)=>{
+                        const angle = (i / data.related.length) * 2 * Math.PI + (Math.random() * 0.2); 
+                        const r = 1.2 + Math.random() * 0.8; 
+                        const x = r * Math.cos(angle), y = r * Math.sin(angle);
+                        nodes.push({x, y, size: Math.max(8, Math.log(p.cited_by_count + 1) * 5), color: p.cited_by_count, label: p.title, year: p.publication_year, citations: p.cited_by_count, url: p.doi});
+                        edgesX.push(0, x, null); edgesY.push(0, y, null);
+                    });
+                    const edgeTrace = {x: edgesX, y: edgesY, mode:'lines', line:{color:'#475569', width:1, opacity: 0.3}, hoverinfo:'none'};
+                    const nodeTrace = {x: nodes.map(n=>n.x), y: nodes.map(n=>n.y), mode: 'markers', marker: {size: nodes.map(n=>n.size), color: nodes.map(n=>n.color || 0), colorscale: 'Bluered', reversescale: true, showscale: false, line: {color: '#ffffff', width: 0.5}}, text: nodes.map(n => `<b>${n.label}</b><br>Year: ${n.year}<br>Citations: ${n.citations}`), hovertemplate: '%{text}<extra></extra>', customdata: nodes.map(n => n.url)};
+                    Plotly.newPlot('graphDiv', [edgeTrace, nodeTrace], {paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', showlegend:false, xaxis:{visible:false}, yaxis:{visible:false}, margin:{t:0,l:0,r:0,b:0}, hovermode: 'closest'}, {displayModeBar:false, responsive: true}).then(gd => { gd.on('plotly_click', d => { const url = d.points[0].customdata; if(url) window.open(url, '_blank'); }); });
+                }
+                function formatDate(isoStr) { return isoStr ? new Date(isoStr).toLocaleDateString() : ''; }
+                function renderMarkdown(text) { return text ? marked.parse(text) : ''; }
+                function getStepName(step) { return STEPS_CONFIG[step-1]?.shortTitle || '未知'; }
+                function getStepColor(step) { return ['bg-blue-900 text-blue-300', 'bg-purple-900 text-purple-300', 'bg-orange-900 text-orange-300', 'bg-indigo-900 text-indigo-300', 'bg-slate-700 text-slate-300', 'bg-green-900 text-green-300'][step-1]; }
+                function testConnection() { alert('API Key Set'); }
+                function exportReport() {
+                    const p = activeProject.value;
+                    let md = `# ${p.title}\n\n${p.stepData[6].finalDraft}`;
+                    const blob = new Blob([md], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `${p.title || 'review'}.md`; a.click();
+                }
+
+                return {
+                    view, apiKey, showKey, loading, loadingText, projectList, activeProject, currentStep, schemeFeedback, selectedEvidenceCount, sparkSchema,
+                    selectedGapIndex, STEPS_CONFIG,
+                    createNewProject, loadProject, clearAllProjects, scrollToStep, toggleStep, nextStep,
+                    runStep1, runStep2, runStep3Spark, runStep4, runStep5, 
+                    generateOutline, addChapter, removeChapter, startWriting, 
+                    selectGap, togglePaper, formatDate, renderMarkdown, getStepName, getStepColor, testConnection, exportReport,
+                    renameProject, deleteProject
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
 </html>
